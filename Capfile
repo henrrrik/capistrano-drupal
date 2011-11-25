@@ -32,8 +32,10 @@ namespace :drupal do
     run "mkdir -p #{shared_path}/config"
   end
 
-  # Create settings.php in shared/config (Drupal 7)
+  # Create settings.php in shared/config
   task :createconfig, :roles => :web do
+
+    # Drupal 7
     configuration = <<-EOF
 <?php
 
@@ -46,6 +48,15 @@ $databases['default']['default'] = array(
   'prefix'   => '',
 );
 EOF
+
+    # Drupal 6
+
+    # configuration = <<-EOF
+# <?php
+# $db_url = 'mysql://#{db_user}:#{db_password}@#{db_host}/#{db_name}';
+# $db_prefix = '';
+# EOF
+
     put configuration, "#{deploy_to}/#{shared_dir}/config/local_settings.php"
   end
   
