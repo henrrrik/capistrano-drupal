@@ -13,6 +13,17 @@ railsless-deploy for convenient overrides.
 
 `config/deploy/<stagename>.rb` - stage-specific settings
 
+It expects the following files for each stage:
+
+    sites/<site>/settings.<stage>.php
+    <stage>.robots.txt
+    <stage>.htaccess
+
+`.htaccess`, `settings.php` and `robots.txt` should be in your
+`.gitignore`. That way each team member can have their own local
+development setup.
+
+
 ##Usage
 
 Set up the deployment folders and settings file:
