@@ -27,8 +27,8 @@ after 'deploy:cleanup', 'drupal:cleanup'
 namespace :drupal do
   task :setup, :roles => :web, :except => { :no_release => true } do
     run "mkdir -p #{shared_path}/files"
-    run "chown #{site_files_chown} #{shared_path}/files" unless site_files_chown.empty?
-    run "chmod #{site_files_chmod} #{shared_path}/files" unless site_files_chmod.empty?
+    run "chown #{site_files_chown} #{shared_path}/files" if exists?(:site_files_chown)
+    run "chmod #{site_files_chmod} #{shared_path}/files" if exists?(:site_files_chmod)
     run "mkdir -p #{deploy_to}/dumps"
     run "mkdir -p #{shared_path}/config"
   end
