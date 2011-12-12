@@ -60,7 +60,7 @@ EOF
 
     put configuration, "#{deploy_to}/#{shared_dir}/config/local_settings.php"
   end
-  
+
   # Create a symlink from the latest release to the shared files directory
   task :symlink, :roles => :web, :only => { :primary => true }, :except => { :no_release => true } do
     run "ln -s #{shared_path}/files #{latest_release}/sites/#{site}/files"
@@ -94,7 +94,7 @@ EOF
   task :dump, :roles => :web, :only => { :primary => true } do
     if previous_release then 
       filename = "#{releases[-2]}.dump.sql"
-      
+
       # Make sure we don't have a dump with the same name from a failed deployment.
       if remote_file_exists?("#{deploy_to}/dumps/#{filename}") then
         run "rm -f #{deploy_to}/dumps/#{filename}"
@@ -129,6 +129,61 @@ EOF
   task :update, :roles => :web, :only => { :primary => true } do
     run "#{drush} --uri=#{site} --root=#{current_path} updatedb -y"
   end
+
+
+  desc "Download and import the remote database"
+  task :pulldb, :roles => :web, :only => { :primary => true } do
+
+    # overwrite these if necessary
+    set :mysqldump_remote_tmp_dir, "/tmp" unless exists?(:mysqldump_remote_tmp_dir)
+    set :mysqldump_local_tmp_dir, "/tmp" unless exists?(:mysqldump_local_tmp_dir)
+
+    # for convenience
+    set :mysqldump_filename, "%s-%s.sql" % [application, Time.now.to_i]
+    set :mysqldump_filename_gz, "%s.gz" % mysqldump_filename
+    set :mysqldump_remote_filename, File.join( mysqldump_remote_tmp_dir, mysqldump_filename_gz )
+    set :mysqldump_local_filename, File.join( mysqldump_local_tmp_dir, mysqldump_filename )
+    set :mysqldump_local_filename_gz, File.join( mysqldump_local_tmp_dir, mysqldump_filename_gz )
+
+    run "#{drush} --uri=#{site} --root=#{current_path} sql-dump | gzip > #{mysqldump_remote_filename}"
+
+    download mysqldump_remote_filename, mysqldump_local_filename_gz, :via => :scp
+    run "rm #{mysqldump_remote_filename}"
+
+    `gunzip #{mysqldump_local_filename_gz}`
+    `drush sql-cli --uri=#{site} < #{mysqldump_local_filename}`
+    `rm #{mysqldump_local_filename}`
+  end
+
+  desc "Upload and import the local database"
+  task :pushdb, :roles => :web, :only => { :primary => true } do
+
+    unless Capistrano::CLI.ui.agree("Are you sure you want overwrite the database on #{stage}? (yes/no): ")
+      puts "Aborting."
+      exit
+    end
+
+    # overwrite these if necessary
+    set :mysqldump_remote_tmp_dir, "/tmp" unless exists?(:mysqldump_remote_tmp_dir)
+    set :mysqldump_local_tmp_dir, "/tmp" unless exists?(:mysqldump_local_tmp_dir)
+
+    # for convenience
+    set :mysqldump_filename, "%s-%s.sql" % [application, Time.now.to_i]
+    set :mysqldump_filename_gz, "%s.gz" % mysqldump_filename
+    set :mysqldump_remote_filename, File.join( mysqldump_remote_tmp_dir, mysqldump_filename )
+    set :mysqldump_remote_filename_gz, File.join( mysqldump_remote_tmp_dir, mysqldump_filename_gz )
+    set :mysqldump_local_filename, File.join( mysqldump_local_tmp_dir, mysqldump_filename )
+
+    `drush --uri=#{site} sql-dump | gzip > #{mysqldump_local_filename}`
+
+    upload mysqldump_local_filename, mysqldump_remote_filename_gz, :via => :scp
+    `rm #{mysqldump_local_filename}`
+
+    run "gunzip #{mysqldump_remote_filename_gz}"
+    run "drush sql-cli --uri=#{site} --root=#{current_path} < #{mysqldump_remote_filename}"
+    run "rm #{mysqldump_remote_filename}"
+  end
+
 
   # When rolling back, restore the database too
   task :rollback, :roles => :web, :only => { :primary => true } do
